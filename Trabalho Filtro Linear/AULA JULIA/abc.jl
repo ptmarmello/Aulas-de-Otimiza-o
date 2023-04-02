@@ -1,0 +1,40 @@
+using JuMP,GLPK
+model = Model(GLPK.Optimizer)
+@variable(model, x1)
+@variable(model, x2)
+@variable(model, δ)
+@variable(model, Δ)
+
+@constraint(model, δ >= x2-10)
+@constraint(model, δ >= -(x2-10))
+@constraint(model, Δ >= x1+2)
+@constraint(model, Δ >= -(x1+2))
+@constraint(model, x2 >= -x2)
+@constraint(model, Δ + x2 <= 5)
+obj = (2*x1) + 3*δ
+@objective(model, Min, obj)
+optimize!(model)
+status = termination_status(model)
+xum = value.(x1)
+delta = value.(x1)
+answ1 = 2*xum + 3*delta
+
+model = Model(GLPK.Optimizer)
+@variable(model, x1)
+@variable(model, x2)
+@variable(model, δ)
+@variable(model, Δ)
+
+@constraint(model, δ >= x2-10)
+@constraint(model, δ >= -(x2-10))
+@constraint(model, Δ >= x1+2)
+@constraint(model, Δ >= -(x1+2))
+@constraint(model, x2 >= -x2)
+@constraint(model, Δ + x2 <= 5)
+obj = -((2*x1) + 3*δ)
+@objective(model, Max, obj)
+optimize!(model)
+status = termination_status(model)
+xum = value.(x1)
+delta = value.(x1)
+answ2 = 2*xum + 3*delta

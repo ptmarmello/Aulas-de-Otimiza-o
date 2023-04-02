@@ -1,0 +1,421 @@
+/*
+ * Programa Simplex.c
+ * Resolve o problema de otimizaÃ§Ã£o linear
+ *
+        min Cx
+        Ax = b
+        x >= 0
+
+ * utilizando o mÃ©todo simplex revisado
+ *
+ * Criado por Vinicius A. de Souza
+ * va.vinicius@gmail.com
+ *
+*/
+
+
+
+#include <stdio.h>
+#include <stdlib.h>
+
+
+
+void main(){
+
+    //dimensÃµes das matrizes utilizadas
+    int NumLinhas_A, NumColunas_A, NumLinhas_b, NumLinhas_c;
+
+    //matriz de coeficientes A
+    double **A;
+
+    //matriz inversa de B
+    double **InvB;
+
+    //vetores constantes c: custos, b: limitantes das restricoes
+    double *c, *b;
+
+    //vetor de solucao atual
+    double *b_chapeu;
+
+    //valor da funcao objetivo
+    double f = 0.0;
+
+    //variaveis auxiliares
+    int i,j, k, l, flag;
+    double auxiliar = 0.0;
+    int aux = 0.0, min = 1000000, iteracoes, aux2;
+    double *vetor_auxiliar;
+
+    //variaveis auxiliares usadas no processo de pivoteamento
+    double pivo, elemento_a_zerar;
+    int linha_pivo;
+
+    //variaveis auxiliares para calculo dos custos relativos
+    double *interm, res = 0.0, custo_relativo = 0.0, menor_custo_relativo=10000000;
+
+    //Define numero de variaveis bÃ¡sicas e nÃ£o bÃ¡sicas
+    int Num_Var_Nao_Basicas, Num_Var_Basicas;
+
+    //vetor de indices bÃ¡sicos e indices nÃ£o basicos
+    int *IndicesBasicos, *IndicesNaoBasicos;
+
+    //Indices de quem entra e de quem sai da base
+    int IndiceQueEntraBase, IndiceQueSaiBase;
+
+    //posiÃ§Ãµes de quem entra e quem sai dentro dos vetores de indices
+    int posEntra, posSai;
+
+
+///////////////////////////// configuraÃ§Ãµes iniciais ///////////////////////////////////////////
+
+
+    printf("\n\nPrograma Simplex\n\n");
+
+
+    //ENTRADA DE DADOS
+    printf("Entrada de dados.\n");
+    printf("\nNumero de linhas da matriz A: ");
+    scanf("%d", &NumLinhas_A);
+    printf("\nNumero de colunas da matriz A: ");
+    scanf("%d", &NumColunas_A);
+    printf("\nNumero de colunas do vetor b: ");
+    scanf("%d", &NumLinhas_b);
+    printf("\nNumero de colunas do vetor c: ");
+    scanf("%d", &NumLinhas_c);
+
+
+    //ALOCAÃ‡ÃƒO DAS MATRIZES
+
+    A = (double **) malloc(NumLinhas_A*sizeof(double *));
+    for(i=0; i<NumLinhas_A; i++)
+        A[i] = (double *) malloc(NumColunas_A*sizeof(double));
+
+    b = (double*) malloc(NumLinhas_b*sizeof(double));
+
+    c = (double*) malloc(NumLinhas_c*sizeof(double));
+
+
+    //OBTENÃ‡ÃƒO DOS VALORES - POPULAÃ‡ÃƒO DAS MATRIZES
+
+    printf("\n\nPreenchimento dos valores da matriz A.");
+    for(i=0;i<NumLinhas_A; i++){
+        for(j=0;j<NumColunas_A; j++){
+
+            printf("\n   A[%d][%d] = ",i,j);
+            scanf("%lf", &auxiliar);
+		  A[i][j] = auxiliar;
+            //printf("\nAuxiliar: %d", auxiliar);
+        }
+
+        printf("\n");
+
+    }
+
+	//verifica valores da matriz A
+/*
+    for(i=0;i<NumLinhas_A; i++){
+        for(j=0;j<NumColunas_A; j++){
+            printf("A[%d][%d] = %f\n", i,j,A[i][j]);
+        }
+        printf("\n");
+    }
+
+*/
+
+
+    printf("\n\nPreenchimento dos valores do vetor b.");
+    for(i=0; i<NumLinhas_b; i++){
+
+        printf("\n   b[%d] = ", i);
+        scanf("%lf", &auxiliar);
+	   b[i] = auxiliar;
+        //printf("\nb[%d] = %f", i,b[i]);
+
+    }
+
+    printf("\n\nPreenchimento dos valores do vetor c.");
+    for(i=0; i<NumLinhas_c; i++){
+
+        printf("\n   c[%d] = ", i);
+        scanf("%lf", &auxiliar);
+	   c[i] = auxiliar;
+	   //printf("\nc[%d] = %f", i,c[i]);
+
+    }
+
+
+
+    //define numero de variaveis bÃ¡sicas e nÃ£o basicas
+    Num_Var_Nao_Basicas = NumColunas_A - NumLinhas_A;
+    Num_Var_Basicas = NumLinhas_A;
+
+    //printf("\nnumero de variaveis basicas: %d --- nao basicas: %d\n", Num_Var_Basicas, Num_Var_Nao_Basicas);
+
+
+
+    //cria arrays que armazenam os indices
+    IndicesBasicos = (int *) malloc(Num_Var_Basicas*sizeof(int));
+    IndicesNaoBasicos = (int *) malloc(Num_Var_Nao_Basicas*sizeof(int));
+
+
+    //obtem indices das colunas basicas
+    printf("\n\nEntre com indices das colunas basicas: ");
+    for(i=0; i<Num_Var_Basicas; i++){
+
+        printf("\n   Indice = ");
+        scanf("%d", &IndicesBasicos[i]);
+        //printf("\nIndice basico: %d\n", IndicesBasicos[i]);
+
+    }
+
+
+
+    //obtem indices das colunas nao basicas
+    printf("\n\nEntre com indices das colunas nao basicas: ");
+    for(i=0; i<Num_Var_Nao_Basicas; i++){
+
+        printf("\n   Indice = ");
+        scanf("%d", &IndicesNaoBasicos[i]);
+	   //printf("\nTeste: Indice nao basico: %d\n", IndicesNaoBasicos[i]);
+
+    }
+
+    //inicializa inversa de B
+     InvB = (double **) malloc(Num_Var_Basicas*sizeof(double *));
+     for(i=0; i<Num_Var_Basicas; i++)
+        InvB[i] = (double *) malloc(Num_Var_Basicas*sizeof(double));
+
+     for(i=0;i<Num_Var_Basicas; i++){
+        for(j=0;j<Num_Var_Basicas; j++){
+
+			InvB[i][j] = A[i][IndicesBasicos[j]];
+			//printf("\nInvB[%d][%d] = %f\n", i,j,InvB[i][j]);
+		}
+		//printf("\n");
+	}
+
+
+
+    //aloca vetor de solucao atual
+    b_chapeu = (double *) malloc(NumLinhas_b*sizeof(double));
+
+
+    //inicializa b chapeu
+	for(i=0; i<Num_Var_Basicas; i++){
+
+	    b_chapeu[i] = 0.0;
+	    b_chapeu[i] = b[i];
+	    //printf("\nb chapeu[%d]: %f\n", i,b_chapeu[i]);
+
+
+	}
+
+
+//////////////////////////// processamento /////////////////////////////////////////////////////
+
+
+    flag = 1; iteracoes = 0;
+
+	//alocacao intermediaria para o produto inv(B) * a_i
+	interm = (double *) malloc(NumLinhas_A*sizeof(double));
+
+	//alocaÃ§Ã£o para vetor temporario de atualizacao dos a_k
+	vetor_auxiliar = (double *) malloc(Num_Var_Basicas*sizeof(double));
+
+
+
+    while( (flag == 1 ) ){
+
+		f = 0.0;
+
+        //calcula valor de f
+		for(i=0; i<Num_Var_Basicas; i++)
+			f += c[IndicesBasicos[i]] * b_chapeu[i];
+
+
+		//calculo dos custos relativos
+		for(i=0; i<Num_Var_Nao_Basicas; i++){
+
+			for(j=0; j<Num_Var_Nao_Basicas; j++)
+				interm[j] = 0.0; //inicializa
+
+
+			//inv(B)*coluna Ai
+			for(j=0; j<Num_Var_Basicas; j++){
+				for(k=0; k<Num_Var_Basicas; k++){
+
+					interm[j] += InvB[j][k] * A[k][IndicesNaoBasicos[i]];
+
+				}
+			}
+
+			res = 0.0;
+
+			//custo basico * resultado acima
+			for(l=0; l<Num_Var_Basicas; l++){
+
+				res += c[IndicesBasicos[l]] * interm[l];
+
+			}
+
+			//custo relativo serÃ¡
+			custo_relativo = c[IndicesNaoBasicos[i]] - res;
+
+			//verificamos o menor custo relativo, e pegamos o indice associado
+			if(custo_relativo < menor_custo_relativo){
+
+				menor_custo_relativo = custo_relativo;
+				IndiceQueEntraBase = IndicesNaoBasicos[i];
+				posEntra = i;
+
+			}
+
+
+		}//for custos relativos
+
+
+           //printf("\nMenor Custo relativo: %f -- Indice entra: %d\n --- pos: %d", menor_custo_relativo, IndiceQueEntraBase, posEntra);
+
+
+		//verifica se menor custo relativo eh negativo
+		if(menor_custo_relativo >= 0)
+			break; //encerra
+
+
+		for(i=0; i<Num_Var_Basicas; i++) vetor_auxiliar[i] = 0.0;
+
+		//atualizaÃ§Ã£o da coluna a_k
+		for(i=0; i<Num_Var_Basicas; i++){
+			for(j=0; j<Num_Var_Basicas; j++){
+
+				vetor_auxiliar[i] += InvB[i][j]*A[j][IndiceQueEntraBase];
+
+			}
+
+		}//fim atualizacao de a_k
+
+
+		//transfere valores para matriz A
+		for(i=0; i<Num_Var_Basicas; i++) A[i][IndiceQueEntraBase] = vetor_auxiliar[i];
+
+
+		min = 1000000;
+		flag = 0; //supÃµe soluÃ§Ã£o infinita
+
+		//verifica quem sai da base
+		for(i=0; i<Num_Var_Basicas; i++){
+
+			if(A[i][IndiceQueEntraBase] > 0){
+
+				flag = 1; //solucao nÃ£o tende a menos infinito
+
+				if(b_chapeu[i] / A[i][IndiceQueEntraBase] < min){
+
+					min = b_chapeu[i] / A[i][IndiceQueEntraBase];
+					IndiceQueSaiBase = IndicesBasicos[i];
+					posSai = i;
+
+				}
+
+			}
+
+		}//fim quem sai base
+
+		//controle: printf("\nSai da base indice %d --- valor: %d --- pos: %d\n", IndiceQueSaiBase, min,posSai);
+
+
+		//atualizaÃ§Ã£o - realiza pivoteamento.
+
+		// a linha pivo Ã© dada pelo indice de quem sai: posSai, que passarei a chamar de linha_pivo
+
+		linha_pivo = posSai;
+
+		//comeÃ§ando colocando 1 na posicao pivo
+		pivo = A[posSai][IndiceQueEntraBase];
+
+		for(i=0; i<Num_Var_Basicas; i++) InvB[linha_pivo][i] = InvB[linha_pivo][i]/pivo;
+		A[linha_pivo][IndiceQueEntraBase] = A[linha_pivo][IndiceQueEntraBase]/pivo;
+		b_chapeu[linha_pivo] = b_chapeu[linha_pivo]/pivo; //posicao com valor 1
+		//controle: printf("\nB chapeu no pivo: b[%d] = %f\n", linha_pivo, b_chapeu[linha_pivo]);
+
+
+		//a partir da linha do pivo, irei para as linhas abaixo desta
+		for(i=(linha_pivo+1); i<Num_Var_Basicas; i++){
+
+			elemento_a_zerar = A[i][IndiceQueEntraBase];
+			//controle: printf("\nelemento a zerar: %f\n", elemento_a_zerar);
+
+			if(elemento_a_zerar != 0){
+
+				for(j=0; j<Num_Var_Basicas; j++) InvB[i][j] = InvB[i][j]-(elemento_a_zerar*InvB[linha_pivo][j]);
+				A[i][IndiceQueEntraBase] = A[i][IndiceQueEntraBase] - (elemento_a_zerar*A[linha_pivo][IndiceQueEntraBase]);
+				b_chapeu[i] = b_chapeu[i] - (elemento_a_zerar*b_chapeu[linha_pivo]);
+
+			}
+
+		}//fim pivoteamento para baixo
+
+
+		//a partir da linha do pivo, irei agora para as linhas acima desta
+		for((i=linha_pivo-1); i > -1; i--){
+
+			elemento_a_zerar = A[i][IndiceQueEntraBase];
+			//controle: printf("\nelemento a zerar: %f\n", elemento_a_zerar);
+
+			if(elemento_a_zerar != 0){
+
+				for(j=0; j<Num_Var_Basicas; j++) InvB[i][j] = InvB[i][j]-(elemento_a_zerar*InvB[linha_pivo][j]);
+				A[i][IndiceQueEntraBase] = A[i][IndiceQueEntraBase] - (elemento_a_zerar*A[linha_pivo][IndiceQueEntraBase]);
+				b_chapeu[i] = b_chapeu[i] - (elemento_a_zerar*b_chapeu[linha_pivo]);
+
+			}
+
+		}//fim pivoteamento para cima
+
+
+		//arrumar indices bÃ¡sicos e nÃ£o bÃ¡sicos
+		aux2 = IndicesBasicos[posSai];
+		IndicesBasicos[posSai] = IndicesNaoBasicos[posEntra];
+		IndicesNaoBasicos[posEntra] = aux2;
+
+
+		//reinicializa as variaveis auxiliares utilizadas neste processo
+		f = 0.0;
+		res = 0.0;
+		aux = 0.0;
+		min = 1000000;
+		menor_custo_relativo = 1000000;
+
+
+		//controle: for(i=0; i<Num_Var_Basicas; i++) printf("\nIndice basico: %d\n", IndicesBasicos[i]);
+		//controle: for(i=0; i<Num_Var_Nao_Basicas; i++) printf("\nIndice nao basico: %d\n", IndicesNaoBasicos[i]);
+
+
+		iteracoes ++;
+
+
+    }//fim do processamento
+
+
+//////////////////////////// resultados /////////////////////////////////////////////////////////
+
+
+	//imprime solucao encontrada
+
+	printf("\n\n\n-------------------------------------------------------------\n SOLUCAO: \n");
+
+	if(flag == 0) printf("\nProblema nao possui solucao finita.\n\n");
+
+	else{
+
+		for(i=0; i<Num_Var_Basicas; i++) printf("\n x[%d] = %f \n", IndicesBasicos[i], b_chapeu[i]);
+		for(i=0; i<Num_Var_Nao_Basicas; i++) printf("\n x[%d] = %d \n", IndicesNaoBasicos[i], 0);
+
+		printf("\nValor da funcao objetivo: %f\n\n", f);
+		printf("\n-------------------------------------------------------------\n\n");
+	}
+
+
+
+
+}
